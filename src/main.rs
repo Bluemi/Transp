@@ -10,14 +10,10 @@ fn print_usage() {
 }
 
 fn main() {
-	let mut arguments = env::args().skip(1);
-	if let Some(x) = arguments.next() {
-		match &*x {
-			"-r" => receiver::call(arguments),
-			"-s" => sender::call(arguments),
-			_ => print_usage(),
-		}
-	} else {
-		print_usage();
+	let mut args = env::args().skip(1);
+	match args.next() {
+		Some(ref x) if x == "-r" => receiver::call(args),
+		Some(ref x) if x == "-s" => sender::call(args),
+		_ => print_usage(),
 	}
 }
