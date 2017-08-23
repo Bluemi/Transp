@@ -1,0 +1,6 @@
+[package]
+name = "transp"
+version = "0.1.0"
+authors = ["Bluemi <bruno.schilling@protonmail.ch>"]
+
+[dependencies]
