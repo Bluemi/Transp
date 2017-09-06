@@ -1,7 +1,8 @@
 use std::iter::Iterator;
 use std::net::TcpListener;
-use std::io::Read;
+use std::io::{Read, Cursor};
 use packet::Packet;
+use byteorder::{BigEndian, ReadBytesExt};
 
 // handler
 
@@ -13,19 +14,27 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 	}
 
 	let listener = TcpListener::bind(format!("0.0.0.0:{}", PORT))
-		.map_err(|x| x.to_string())?;
+		.map_err(|x| format!("Failed to bind TcpListener: {}", x))?;
 
 	// TODO: get own ip address, print it
 
 	return match listener.accept() {
 		Ok((mut socket, _)) => {
-			let mut buffer = Vec::new(); // vec![...]
-			socket.read(&mut buffer)
-				.map_err(|x| x.to_string())?;
-			let p = Packet::deserialize(&buffer)?;
+			let mut size_buffer: Vec<u8> = vec![0; 8];
+			socket.read(&mut size_buffer)
+				.map_err(|x| format!("Failed reading size from socket: {}", x))?;
+			let size = Cursor::new(size_buffer).read_u64::<BigEndian>()
+				.map(|x| x as usize)
+				.map_err(|x| format!("Failed converting size_buffer to size: {}", x.to_string()))?;
+
+			let mut packet_buffer: Vec<u8> = vec![0; size];
+			socket.read(&mut packet_buffer)
+				.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
+			let p = Packet::deserialize(&packet_buffer)
+				.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
 			p.create_files()
 		},
-		Err(e) => Err(format!("couldn't get client: {:?}", e)),
+		Err(e) => Err(format!("TcpListener::accept() failed: {:?}", e)),
 	};
 }
 
@@ -52,7 +61,7 @@ fn secure_filename(mut filename: String) -> Result<String, String> {
 		let stdin = stdin();
 		stdin.lock()
 			.read_line(&mut s)
-			.map_err(|x| x.to_string())?;
+			.map_err(|x| format!("Failed reading a line: {}", x))?;
 		if s.is_empty() { break; }
 		filename = s;
 	}
@@ -67,15 +76,16 @@ fn build_file(arg: &str, content: &str) -> Result<(), String> {
 	let filename: String = secure_filename(arg.to_string())?;
 
 	let mut f = File::create(filename)
-		.map_err(|x| x.to_string())?;
+		.map_err(|x| format!("Failed creating File: {}", x))?;
 	f.write_all(content.as_bytes())
-		.map_err(|x| x.to_string())
+		.map_err(|x| format!("Failed writing to File: {}", x))
 }
 
 fn build_dir(arg: &str) -> Result<(), String> {
-	let dirname = secure_filename(arg.to_string())?;
+	let dirname = secure_filename(arg.to_string())
+		.map_err(|x| format!("Failed Securing Filename: {}", x))?;
 	create_dir(dirname)
-		.map_err(|x| x.to_string())
+		.map_err(|x| format!("Failed creating Directory: {}", x))
 }
 
 impl Packet {
@@ -89,7 +99,8 @@ impl Packet {
 				for packet in packets {
 					let mut new_pbuf = pbuf.clone();
 					new_pbuf.push(name);
-					packet.create_files_to(new_pbuf)?;
+					packet.create_files_to(new_pbuf)
+						.map_err(|x| format!("Packet::create_files_to failed: {}", x))?;
 				}
 				Ok(())
 			},
@@ -98,7 +109,7 @@ impl Packet {
 
 	fn create_files(&self) -> Result<(), String> {
 		let pbuf = current_dir()
-			.map_err(|x| x.to_string())?;
+			.map_err(|x| format!("Failed detecting current dir: {}", x))?;
 		return self.create_files_to(pbuf);
 	}
 }

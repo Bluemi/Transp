@@ -7,6 +7,7 @@ mod packet;
 extern crate serde_derive;
 extern crate serde;
 extern crate bincode;
+extern crate byteorder;
 
 const PORT: u16 = 2345;
 

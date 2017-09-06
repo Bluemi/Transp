@@ -3,6 +3,7 @@ name = "transp"
 version = "0.1.0"
 dependencies = [
  "bincode 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
