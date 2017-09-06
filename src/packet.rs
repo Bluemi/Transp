@@ -13,12 +13,12 @@ pub enum Packet {
 }
 
 impl Packet {
-	fn serialize(&self) -> Result<Vec<u8>, String> {
+	pub fn serialize(&self) -> Result<Vec<u8>, String> {
 		bincode::serialize(self, bincode::Infinite)
 			.map_err(|x| x.to_string())
 	}
 
-	fn deserialize(bin: &Vec<u8>) -> Result<Packet, String> {
+	pub fn deserialize(bin: &Vec<u8>) -> Result<Packet, String> {
 		bincode::deserialize(&bin[..])
 			.map_err(|x| x.to_string())
 	}
