@@ -33,40 +33,52 @@ fn test_cut_path()
 	assert_eq!(s, "path.txt");
 }
 
+#[test]
+fn test_packet_from()
+{
+	let p = Packet::from("./testy");
+	match p {
+		Ok(_) => (),
+		Err(s) => panic!("cant find path src \"{}\"", s),
+	}
+}
+
 impl Packet {
 	fn from(filename: &str) -> Result<Packet, String> {
-		match File::open(&filename) {
-			Ok(mut f) => {
-				let mut contents = String::new();
-				match f.read_to_string(&mut contents) {
-					Ok(_) => return Result::Ok(Packet::File{
-								name: String::from(cut_path(filename)),
-								content: contents.clone(),
-							}),
-					Err(_) => return Result::Err(String::from(format!("couldnt read from {}", filename))),
-				}
-			},
-			// Wenn es kein File ist, ist es ein Ordner?
-			Err(_) => {
-				match fs::read_dir(filename) {
-					Ok(entries) => {
-						let mut packets : Vec<Packet> = Vec::new();
-						for entry in entries {
-							match entry {
-								Ok(dir) => {
-									match Packet::from(dir.path().to_str().unwrap()) {
-										Ok(p) => packets.push(p),
-										Err(s) => return Result::Err(s),
-									}
-								},
-								Err(_) => return Result::Err(String::from(format!("couldnt read dir {}", filename))),
-							}
-						}
-						return Result::Ok(Packet::Directory{name: String::from(cut_path(filename)), packets: packets});
-					},
-					Err(_) => return Result::Err(String::from(format!("couldnt read dir {}", filename))),
-				}
-			},
+		let mut file = File::open(filename)
+			.map_err(|x| x.to_string())?;
+
+		let metad = file.metadata()
+			.map_err(|x| x.to_string())?;
+		if metad.is_dir() {
+			return Packet::from_dir(filename);
+		} else {
+			return Packet::from_file(file, filename);
+		}
+	}
+
+	fn from_dir(filename: &str) -> Result<Packet, String> {
+		let entries = fs::read_dir(filename)
+			.map_err(|x| x.to_string())?;
+		let mut packets : Vec<Packet> = Vec::new();
+		for entry in entries {
+			let dir = entry.map_err(|x| x.to_string())?;
+			match Packet::from(dir.path().to_str().unwrap()) {
+				Ok(p) => packets.push(p),
+				Err(s) => return Err(s),
+			}
+		}
+		return Ok(Packet::Directory{name: String::from(cut_path(filename)), packets: packets});
+	}
+
+	fn from_file(mut file: File, filename: &str) -> Result<Packet, String> {
+		let mut contents = String::new();
+		match file.read_to_string(&mut contents) {
+			Ok(_) => return Ok(Packet::File{
+						name: String::from(cut_path(filename)),
+						content: contents.clone(),
+					}),
+			Err(_) => return Err(String::from(format!("couldnt read from \"{}\"", filename))),
 		}
 	}
 }
