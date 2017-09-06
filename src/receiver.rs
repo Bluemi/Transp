@@ -49,7 +49,7 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 
 // io
 
-use std::fs::{create_dir, metadata, File};
+use std::fs::{create_dir, File};
 use std::io::{stdin, BufRead, Write};
 use std::env::current_dir;
 use std::path::PathBuf;
