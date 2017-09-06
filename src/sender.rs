@@ -54,13 +54,11 @@ fn test_cut_path()
 }
 
 #[test]
-fn test_packet_from()
+fn test_cut_path2()
 {
-	let p = Packet::from("./testy");
-	match p {
-		Ok(_) => (),
-		Err(s) => panic!("cant find path src \"{}\"", s),
-	}
+	let path = String::from("this/is/a/dir/");
+	let s = cut_path(&path);
+	assert_eq!(s, "dir");
 }
 
 impl Packet {
