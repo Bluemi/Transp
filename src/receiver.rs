@@ -5,12 +5,14 @@ use packet::Packet;
 
 // handler
 
+use PORT;
+
 fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 	if args.next().is_some() {
 		return Err(format!("No arguments are required for the receiver!"));
 	}
 
-	let listener = TcpListener::bind("0.0.0.0:2345")
+	let listener = TcpListener::bind(format!("0.0.0.0:{}", PORT))
 		.map_err(|x| x.to_string())?;
 
 	// TODO: get own ip address, print it

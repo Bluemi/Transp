@@ -8,6 +8,8 @@ use std::convert::From;
 
 use packet::Packet;
 
+use PORT;
+
 // client
 pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let ip = args.next()
@@ -15,7 +17,7 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let filename = args.next()
 		.expect("Filename missing");
 
-	let connection_string = format!("{}:2345", ip);
+	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
 	// stream.write(...)
