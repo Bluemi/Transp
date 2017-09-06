@@ -7,6 +7,8 @@ use std::io::prelude::*;
 use std::convert::From;
 
 use packet::Packet;
+use byteorder::BigEndian;
+use byteorder::WriteBytesExt;
 
 use PORT;
 
@@ -20,7 +22,23 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
-	// stream.write(...)
+	let res = Packet::from(&filename);
+	if let Ok(packet) = res {
+		if let Ok(arr) = packet.serialize() {
+			let mut len_vec: Vec<u8> = Vec::new();
+			if let Err(err) = len_vec.write_u64::<BigEndian>(arr.len() as u64) {
+				println!("cant convert arr.len to byte array: {:?}", err);
+			}
+			if let Err(err) = stream.write(&len_vec) {
+				println!("failed to write in stream! {}", err.to_string());
+			}
+			if let Err(err) = stream.write(&arr) {
+				println!("failed to write in stream! {}", err.to_string());
+			}
+		}
+	} else {
+		println!("not ok");
+	}
 }
 
 fn cut_path(path: &str) -> &str {
@@ -47,7 +65,7 @@ fn test_packet_from()
 
 impl Packet {
 	fn from(filename: &str) -> Result<Packet, String> {
-		let mut file = File::open(filename)
+		let file = File::open(filename)
 			.map_err(|x| x.to_string())?;
 
 		let metad = file.metadata()
