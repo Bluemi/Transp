@@ -54,52 +54,49 @@ use std::io::{stdin, BufRead, Write};
 use std::env::current_dir;
 use std::path::PathBuf;
 
-fn secure_filename(mut filename: String) -> Result<String, String> {
-	while path_exists(&filename) {
-		println!("File: {} already exists. Do you want a new name? Empty String for 'No':", filename);
+fn secure_filename(mut pbuf: PathBuf) -> Result<PathBuf, String> {
+	while pbuf.exists() {
+		println!("File: {} already exists. Do you want a new name? Empty String for 'No':", pbuf.to_string_lossy());
 		let mut s = String::new();
 		let stdin = stdin();
 		stdin.lock()
 			.read_line(&mut s)
 			.map_err(|x| format!("Failed reading a line: {}", x))?;
 		if s.is_empty() { break; }
-		filename = s;
+		pbuf.pop();
+		pbuf.push(s);
 	}
-	return Ok(filename);
+	return Ok(pbuf);
 }
 
-fn path_exists(path: &str) -> bool {
-	metadata(path).is_ok()
-}
-
-fn build_file(arg: &str, content: &str) -> Result<(), String> {
-	let filename: String = secure_filename(arg.to_string())?;
-
-	let mut f = File::create(filename)
+fn build_file(pbuf: PathBuf, content: &str) -> Result<(), String> {
+	let pbuf = secure_filename(pbuf)?;
+	let mut f = File::create(pbuf)
 		.map_err(|x| format!("Failed creating File: {}", x))?;
 	f.write_all(content.as_bytes())
 		.map_err(|x| format!("Failed writing to File: {}", x))
 }
 
-fn build_dir(arg: &str) -> Result<(), String> {
-	let dirname = secure_filename(arg.to_string())
+fn build_dir(pbuf: PathBuf) -> Result<(), String> {
+	let pbuf = secure_filename(pbuf)
 		.map_err(|x| format!("Failed Securing Filename: {}", x))?;
-	create_dir(dirname)
+
+	create_dir(pbuf)
 		.map_err(|x| format!("Failed creating Directory: {}", x))
 }
 
 impl Packet {
-	fn create_files_to(&self, pbuf: PathBuf) -> Result<(), String> {
+	fn create_files_to(&self, mut pbuf: PathBuf) -> Result<(), String> {
 		match self {
 			&Packet::File { ref name, ref content } => {
-				build_file(name, content)
+				pbuf.push(name);
+				build_file(pbuf, content)
 			},
 			&Packet::Directory { ref name, ref packets } => {
-				build_dir(name)?;
+				pbuf.push(name);
+				build_dir(pbuf.clone())?;
 				for packet in packets {
-					let mut new_pbuf = pbuf.clone();
-					new_pbuf.push(name);
-					packet.create_files_to(new_pbuf)
+					packet.create_files_to(pbuf.clone())
 						.map_err(|x| format!("Packet::create_files_to failed: {}", x))?;
 				}
 				Ok(())
