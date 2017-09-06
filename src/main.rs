@@ -1,6 +1,12 @@
 use std::env;
 mod receiver;
 mod sender;
+mod packet;
+
+#[macro_use]
+extern crate serde_derive;
+extern crate serde;
+extern crate bincode;
 
 fn print_usage() {
 	println!("transp:");
