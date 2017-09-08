@@ -7,8 +7,7 @@ use std::io::prelude::*;
 use std::convert::From;
 
 use packet::Packet;
-use byteorder::BigEndian;
-use byteorder::WriteBytesExt;
+use bincode;
 
 use PORT;
 
@@ -25,10 +24,11 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let res = Packet::from(&filename);
 	if let Ok(packet) = res {
 		if let Ok(arr) = packet.serialize() {
-			let mut len_vec: Vec<u8> = Vec::new();
-			if let Err(err) = len_vec.write_u64::<BigEndian>(arr.len() as u64) {
-				println!("cant convert arr.len to byte array: {:?}", err);
-			}
+			let len_vec = match bincode::serialize(&(arr.len() as u64), bincode::Infinite) {
+				Ok(x) => x,
+				Err(err) => { println!("cant convert all.len to byte array: {:?}", err); return; }
+			};
+
 			if let Err(err) = stream.write(&len_vec) {
 				println!("failed to write in stream! {}", err.to_string());
 			}

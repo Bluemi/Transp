@@ -1,8 +1,8 @@
 use std::iter::Iterator;
 use std::net::TcpListener;
-use std::io::{Read, Cursor};
+use std::io::Read;
 use packet::Packet;
-use byteorder::{BigEndian, ReadBytesExt};
+use bincode;
 
 // handler
 
@@ -23,7 +23,7 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 			let mut size_buffer: Vec<u8> = vec![0; 8];
 			socket.read(&mut size_buffer)
 				.map_err(|x| format!("Failed reading size from socket: {}", x))?;
-			let size = Cursor::new(size_buffer).read_u64::<BigEndian>()
+			let size = bincode::deserialize::<u64>(&size_buffer[..])
 				.map(|x| x as usize)
 				.map_err(|x| format!("Failed converting size_buffer to size: {}", x.to_string()))?;
 
