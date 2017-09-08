@@ -21,23 +21,25 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
-	let res = Packet::from(&filename);
-	if let Ok(packet) = res {
-		if let Ok(arr) = packet.serialize() {
-			let len_vec = match bincode::serialize(&(arr.len() as u64), bincode::Infinite) {
-				Ok(x) => x,
-				Err(err) => { println!("cant convert all.len to byte array: {:?}", err); return; }
-			};
+	let packet = match Packet::from(&filename) {
+		Ok(x) => x,
+		Err(err) => { println!("Packet::from({}) failed: {:?}", filename, err); return; }
+	};
 
-			if let Err(err) = stream.write(&len_vec) {
-				println!("failed to write in stream! {}", err.to_string());
-			}
-			if let Err(err) = stream.write(&arr) {
-				println!("failed to write in stream! {}", err.to_string());
-			}
-		}
-	} else {
-		println!("not ok");
+	let arr = match packet.serialize() {
+		Ok(arr) => arr,
+		Err(err) => { println!("packet.serialize() failed: {:?}", err); return; }
+	};
+	let len_vec = match bincode::serialize(&(arr.len() as u64), bincode::Infinite) {
+		Ok(x) => x,
+		Err(err) => { println!("cant convert all.len to byte array: {:?}", err); return; }
+	};
+
+	if let Err(err) = stream.write(&len_vec) {
+		println!("failed to write in stream! {}", err.to_string());
+	}
+	if let Err(err) = stream.write(&arr) {
+		println!("failed to write in stream! {}", err.to_string());
 	}
 }
 
@@ -90,13 +92,13 @@ impl Packet {
 	}
 
 	fn from_file(mut file: File, filename: &str) -> Result<Packet, String> {
-		let mut contents = String::new();
-		match file.read_to_string(&mut contents) {
+		let mut contents : Vec<u8> = Vec::new();
+		match file.read_to_end(&mut contents) {
 			Ok(_) => return Ok(Packet::File{
 						name: String::from(cut_path(filename)),
-						content: contents.clone(),
+						content: contents,
 					}),
-			Err(_) => return Err(String::from(format!("couldnt read from \"{}\"", filename))),
+			Err(_) => return Err(format!("couldnt read from \"{}\"", filename)),
 		}
 	}
 }

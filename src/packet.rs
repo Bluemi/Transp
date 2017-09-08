@@ -4,7 +4,7 @@ use bincode;
 pub enum Packet {
 	File {
 		name: String,
-		content: String,
+		content: Vec<u8>,
 	},
 	Directory {
 		name: String,

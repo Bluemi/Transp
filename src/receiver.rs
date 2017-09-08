@@ -73,11 +73,11 @@ fn secure_filename(mut pbuf: PathBuf) -> Result<PathBuf, String> {
 	return Ok(pbuf);
 }
 
-fn build_file(pbuf: PathBuf, content: &str) -> Result<(), String> {
+fn build_file(pbuf: PathBuf, content: &[u8]) -> Result<(), String> {
 	let pbuf = secure_filename(pbuf)?;
 	let mut f = File::create(pbuf)
 		.map_err(|x| format!("Failed creating File: {}", x))?;
-	f.write_all(content.as_bytes())
+	f.write_all(content)
 		.map_err(|x| format!("Failed writing to File: {}", x))
 }
 
