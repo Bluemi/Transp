@@ -36,7 +36,8 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 				.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
 			let p = Packet::deserialize(&packet_buffer)
 				.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
-			p.create_files()
+			// p.create_files() TODO
+			Ok(())
 		},
 		Err(e) => Err(format!("TcpListener::accept() failed: {:?}", e)),
 	};
@@ -90,6 +91,7 @@ fn build_dir(pbuf: PathBuf) -> Result<(), String> {
 }
 
 impl Packet {
+/*
 	fn create_files_to(&self, mut pbuf: PathBuf) -> Result<(), String> {
 		match self {
 			&Packet::File { ref name, ref content } => {
@@ -113,4 +115,5 @@ impl Packet {
 			.map_err(|x| format!("Failed detecting current dir: {}", x))?;
 		return self.create_files_to(pbuf);
 	}
+*/
 }

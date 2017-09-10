@@ -2,13 +2,16 @@ use bincode;
 
 #[derive(Serialize, Deserialize)]
 pub enum Packet {
-	File {
-		name: String,
+	FileCreate {
+		path: String,
 		content: Vec<u8>,
 	},
-	Directory {
-		name: String,
-		packets: Vec<Packet>,
+	FileAppend {
+		path: String,
+		content: Vec<u8>,
+	},
+	DirectoryCreate {
+		path: String,
 	}
 }
 
@@ -24,6 +27,7 @@ impl Packet {
 	}
 }
 
+/*
 #[test]
 fn test_packet_serialization() {
 	let p1 = Packet::File {
@@ -69,3 +73,4 @@ fn test_packet_serialization_dir() {
 		}
 	}
 }
+*/

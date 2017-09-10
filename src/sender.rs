@@ -47,6 +47,7 @@ fn cut_path(path: &str) -> &str {
 	path.split('/').last().unwrap_or(path)
 }
 
+
 #[test]
 fn test_cut_path()
 {
@@ -65,6 +66,8 @@ fn test_cut_path2()
 
 impl Packet {
 	fn from(filename: &str) -> Result<Packet, String> {
+		return Err("ARGH!".to_string());
+	/*
 		let file = File::open(filename)
 			.map_err(|x| x.to_string())?;
 
@@ -75,8 +78,10 @@ impl Packet {
 		} else {
 			return Packet::from_file(file, filename);
 		}
+	*/
 	}
 
+/*
 	fn from_dir(filename: &str) -> Result<Packet, String> {
 		let entries = fs::read_dir(filename)
 			.map_err(|x| x.to_string())?;
@@ -101,4 +106,5 @@ impl Packet {
 			Err(_) => return Err(format!("couldnt read from \"{}\"", filename)),
 		}
 	}
+*/
 }
