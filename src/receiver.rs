@@ -22,25 +22,26 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 		None => println!("Couldn't find local IP address"),
 	}
 
-	return match listener.accept() {
-		Ok((mut socket, _)) => {
-			let mut size_buffer: Vec<u8> = vec![0; 8];
-			socket.read(&mut size_buffer)
-				.map_err(|x| format!("Failed reading size from socket: {}", x))?;
-			let size = bincode::deserialize::<u64>(&size_buffer[..])
-				.map(|x| x as usize)
-				.map_err(|x| format!("Failed converting size_buffer to size: {}", x.to_string()))?;
+	let mut socket = listener.accept()
+		.map(|(x, _)| x)
+		.map_err(|x| format!("TcpListener::accept() failed: {:?}", x))?;
 
-			let mut packet_buffer: Vec<u8> = vec![0; size];
-			socket.read(&mut packet_buffer)
-				.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
-			let p = Packet::deserialize(&packet_buffer)
-				.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
-			// p.create_files() TODO
-			Ok(())
-		},
-		Err(e) => Err(format!("TcpListener::accept() failed: {:?}", e)),
-	};
+	loop {
+		let mut size_buffer: Vec<u8> = vec![0; 8];
+		socket.read(&mut size_buffer)
+			.map_err(|x| format!("Failed reading size from socket: {}", x))?;
+		let size = bincode::deserialize::<u64>(&size_buffer[..])
+			.map(|x| x as usize)
+			.map_err(|x| format!("Failed converting size_buffer to size: {}", x.to_string()))?;
+
+		let mut packet_buffer: Vec<u8> = vec![0; size];
+		socket.read(&mut packet_buffer)
+			.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
+		let p = Packet::deserialize(&packet_buffer)
+			.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
+		// p.create_files();
+		return Ok(()); // TODO remove
+	}
 }
 
 pub fn call<T: Iterator<Item=String>>(args: T) {
