@@ -27,50 +27,48 @@ impl Packet {
 	}
 }
 
-/*
 #[test]
-fn test_packet_serialization() {
-	let p1 = Packet::File {
-		name: String::from("NAME"),
-		content: String::from("CONTENT"),
+fn test_packet_serialization_filecreate() {
+	let obj = Packet::FileCreate {
+		path: String::from("PATH"),
+		content: vec![1, 2, 4],
 	};
-	let b = p1.serialize().unwrap();
-	let p2 = Packet::deserialize(&b).unwrap();
-	match p2 {
-		Packet::File { name: n, content: c } => {
-			assert_eq!(n, String::from("NAME"));
-			assert_eq!(c, String::from("CONTENT"));
+	let bytes = obj.serialize().unwrap();
+	match Packet::deserialize(&bytes).unwrap() {
+		Packet::FileCreate { path: p, content: c } => {
+			assert_eq!(p, String::from("PATH"));
+			assert_eq!(c, vec![1, 2, 4]);
 		},
-		Packet::Directory { .. } => panic!("p2 should be File"),
+		_ => panic!("should be FileCreate"),
 	}
 }
 
 #[test]
-fn test_packet_serialization_dir() {
-	let f1 = Packet::File {
-		name: String::from("NAME"),
-		content: String::from("CONTENT"),
+fn test_packet_serialization_fileappend() {
+	let obj = Packet::FileAppend {
+		path: String::from("PATH"),
+		content: vec![2, 3, 5],
 	};
-	let dir = Packet::Directory {
-		name: String::from("thisDir"),
-		packets: vec![f1],
-	};
-	let b = dir.serialize().unwrap();
-	let dir2 = Packet::deserialize(&b).unwrap();
-
-	match dir2 {
-		Packet::File { .. }  => panic!("dir2 should be a Directory"),
-		Packet::Directory{name: n, packets: p} => {
-			assert_eq!(String::from("thisDir"), n);
-			assert_eq!(1, p.len());
-			match &p[0] {
-				&Packet::File { name: ref n, content: ref c } => {
-					assert_eq!(n, "NAME");
-					assert_eq!(c, "CONTENT");
-				},
-				&Packet::Directory { .. } => panic!("p should be File"),
-			}
-		}
+	let bytes = obj.serialize().unwrap();
+	match Packet::deserialize(&bytes).unwrap() {
+		Packet::FileAppend { path: p, content: c } => {
+			assert_eq!(p, String::from("PATH"));
+			assert_eq!(c, vec![2, 3, 5]);
+		},
+		_ => panic!("should be FileAppend"),
 	}
 }
-*/
+
+#[test]
+fn test_packet_serialization_dircreate() {
+	let obj = Packet::DirectoryCreate {
+		path: String::from("PATH"),
+	};
+	let bytes = obj.serialize().unwrap();
+	match Packet::deserialize(&bytes).unwrap() {
+		Packet::DirectoryCreate { path: p } => {
+			assert_eq!(String::from("PATH"), p);
+		},
+		_ => panic!("should be DirectoryCreate"),
+	}
+}
