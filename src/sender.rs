@@ -23,7 +23,7 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
 	send(&PathBuf::from(&filename), &mut stream).unwrap();
-	stream.write_all(&Packet::Done.serialize().unwrap()[..]).unwrap();
+	send_packet(&Packet::Done, &mut stream).unwrap();
 }
 
 fn send(path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
