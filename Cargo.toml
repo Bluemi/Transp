@@ -7,4 +7,4 @@ authors = ["Bluemi <bruno.schilling@protonmail.ch>"]
 serde = "1.0"
 serde_derive = "1.0"
 bincode = "0.8"
-local-ip = "0.1"
+get_if_addrs = "0.4.0"

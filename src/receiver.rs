@@ -3,7 +3,8 @@ use std::net::TcpListener;
 use std::io::Read;
 use packet::Packet;
 use bincode;
-use local_ip;
+
+extern crate get_if_addrs;
 
 // handler
 
@@ -17,10 +18,21 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 	let listener = TcpListener::bind(format!("0.0.0.0:{}", PORT))
 		.map_err(|x| format!("Failed to bind TcpListener: {}", x))?;
 
-	match local_ip::get() {
-		Some(ip) => println!("Your IP: {}", ip),
-		None => println!("Couldn't find local IP address"),
+	match get_if_addrs::get_if_addrs() {
+		Ok(ifaces) => {
+			match ifaces.iter()
+				.map(|x| x.ip())
+				.map(|x| x.to_string())
+				.filter(|x| x.starts_with("192.168.178."))
+				.next() {
+
+				Some(ip) => println!("Your IP: {}", ip),
+				None => println!("Couldn't find local IP address"),
+			}
+		},
+		Err(_) => println!("Couldn't access IP addresses"),
 	}
+
 
 	return match listener.accept() {
 		Ok((mut socket, _)) => {
