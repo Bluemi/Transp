@@ -6,12 +6,13 @@ use std::fs;
 use std::io::prelude::*;
 use std::convert::From;
 
+use std::path::PathBuf;
+
 use packet::Packet;
 use bincode;
 
 use PORT;
 
-// client
 pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let ip = args.next()
 		.expect("Ip address missing");
@@ -21,66 +22,79 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
-	let packet = match Packet::from(&filename) {
-		Ok(x) => x,
-		Err(err) => { println!("Packet::from({}) failed: {:?}", filename, err); return; }
-	};
+	send(&PathBuf::from(&filename), &mut stream).unwrap();
 
-	let arr = match packet.serialize() {
-		Ok(arr) => arr,
-		Err(err) => { println!("packet.serialize() failed: {:?}", err); return; }
-	};
-	let len_vec = match bincode::serialize(&(arr.len() as u64), bincode::Infinite) {
-		Ok(x) => x,
-		Err(err) => { println!("cant convert all.len to byte array: {:?}", err); return; }
-	};
+}
 
+fn send(path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
+	let open_str: &str = path.to_str()
+		.ok_or_else(|| String::from("cant transform path into string"))?;
+	let mut file = File::open(open_str)
+		.map_err(|x| x.to_string())?;
+
+	let metad = file.metadata()
+		.map_err(|x| x.to_string())?;
+	if metad.is_dir() {
+		send_dir(stream, path)
+	} else {
+		send_file(&mut file, stream, path)
+	}
+}
+
+fn send_dir(stream: &mut TcpStream, path: &PathBuf) -> Result<(), String> {
+	let path_str: &str = path.to_str()
+		.ok_or_else(|| String::from("cant transform path into string"))?;
+	let p: Packet = Packet::DirectoryCreate {
+		path: String::from(path_str),
+	};
+	send_packet(&p, stream).unwrap();
+
+	// send recursive sub directories/files
+	let entries = fs::read_dir(path)
+		.map_err(|x| x.to_string())?;
+	for entry in entries {
+		let dir = entry.map_err(|x| x.to_string())?;
+		let mut tmp_path = path.clone();
+		tmp_path.push(dir.file_name());
+		send(&tmp_path, stream).unwrap();
+	}
+	Ok(())
+}
+
+fn send_file(file: &mut File, stream: &mut TcpStream, path: &PathBuf) -> Result<(), String> {
+	let mut contents : Vec<u8> = Vec::new();
+	match file.read_to_end(&mut contents) {
+		Ok(_) => {
+			let path_str: &str = path.to_str()
+				.ok_or_else(|| String::from("cant transform path into string"))?;
+			let packet: Packet = Packet::FileCreate {
+				path: String::from(path_str),
+				content: contents,
+			};
+			send_packet(&packet, stream).unwrap();
+		},
+		Err(err) => {
+			let path_str: &str = path.to_str()
+				.ok_or_else(|| String::from("cant transform path into string"))?;
+			return Err(format!("couldnt read from \"{}\": {:?}", path_str, err))
+		}
+	}
+	Ok(())
+}
+
+fn send_packet(packet: &Packet, stream: &mut TcpStream) -> Result<(), String> {
+	let arr = packet.serialize().map_err(|x| x.to_string())?;
+	let len_vec = bincode::serialize(&(arr.len() as u64), bincode::Infinite).map_err(|x| x.to_string())?;
 	if let Err(err) = stream.write(&len_vec) {
 		println!("failed to write in stream! {}", err.to_string());
 	}
 	if let Err(err) = stream.write(&arr) {
 		println!("failed to write in stream! {}", err.to_string());
 	}
-}
-
-fn cut_path(path: &str) -> &str {
-	path.split('/').last().unwrap_or(path)
-}
-
-
-#[test]
-fn test_cut_path()
-{
-	let path = String::from("this/is/a/path.txt");
-	let s = cut_path(&path);
-	assert_eq!(s, "path.txt");
-}
-
-#[test]
-fn test_cut_path2()
-{
-	let path = String::from("this/is/a/dir/");
-	let s = cut_path(&path);
-	assert_eq!(s, "dir");
+	Ok(())
 }
 
 impl Packet {
-	fn from(filename: &str) -> Result<Packet, String> {
-		return Err("ARGH!".to_string());
-	/*
-		let file = File::open(filename)
-			.map_err(|x| x.to_string())?;
-
-		let metad = file.metadata()
-			.map_err(|x| x.to_string())?;
-		if metad.is_dir() {
-			return Packet::from_dir(filename);
-		} else {
-			return Packet::from_file(file, filename);
-		}
-	*/
-	}
-
 /*
 	fn from_dir(filename: &str) -> Result<Packet, String> {
 		let entries = fs::read_dir(filename)
@@ -94,17 +108,6 @@ impl Packet {
 			}
 		}
 		return Ok(Packet::Directory{name: String::from(cut_path(filename)), packets: packets});
-	}
-
-	fn from_file(mut file: File, filename: &str) -> Result<Packet, String> {
-		let mut contents : Vec<u8> = Vec::new();
-		match file.read_to_end(&mut contents) {
-			Ok(_) => return Ok(Packet::File{
-						name: String::from(cut_path(filename)),
-						content: contents,
-					}),
-			Err(_) => return Err(format!("couldnt read from \"{}\"", filename)),
-		}
 	}
 */
 }
