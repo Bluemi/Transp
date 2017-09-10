@@ -12,7 +12,8 @@ pub enum Packet {
 	},
 	DirectoryCreate {
 		path: String,
-	}
+	},
+	Done
 }
 
 impl Packet {
@@ -69,6 +70,16 @@ fn test_packet_serialization_dircreate() {
 		Packet::DirectoryCreate { path: p } => {
 			assert_eq!(String::from("PATH"), p);
 		},
+		_ => panic!("should be DirectoryCreate"),
+	}
+}
+
+#[test]
+fn test_packet_serialization_done() {
+	let obj = Packet::Done;
+	let bytes = obj.serialize().unwrap();
+	match Packet::deserialize(&bytes).unwrap() {
+		Packet::Done => {},
 		_ => panic!("should be DirectoryCreate"),
 	}
 }
