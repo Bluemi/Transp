@@ -23,7 +23,7 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
 	send(&PathBuf::from(&filename), &mut stream).unwrap();
-
+	stream.write_all(&Packet::Done.serialize().unwrap()[..]).unwrap();
 }
 
 fn send(path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
@@ -92,22 +92,4 @@ fn send_packet(packet: &Packet, stream: &mut TcpStream) -> Result<(), String> {
 		println!("failed to write in stream! {}", err.to_string());
 	}
 	Ok(())
-}
-
-impl Packet {
-/*
-	fn from_dir(filename: &str) -> Result<Packet, String> {
-		let entries = fs::read_dir(filename)
-			.map_err(|x| x.to_string())?;
-		let mut packets : Vec<Packet> = Vec::new();
-		for entry in entries {
-			let dir = entry.map_err(|x| x.to_string())?;
-			match Packet::from(dir.path().to_str().unwrap()) {
-				Ok(p) => packets.push(p),
-				Err(s) => return Err(s),
-			}
-		}
-		return Ok(Packet::Directory{name: String::from(cut_path(filename)), packets: packets});
-	}
-*/
 }
