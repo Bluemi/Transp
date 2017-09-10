@@ -5,6 +5,10 @@ use packet::Packet;
 use bincode;
 use local_ip;
 
+use std::fs::{create_dir, File, OpenOptions};
+use std::io::{stdin, BufRead, Write};
+use std::path::PathBuf;
+
 // handler
 
 use PORT;
@@ -39,8 +43,12 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 			.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
 		let p = Packet::deserialize(&packet_buffer)
 			.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
-		// p.create_files();
-		return Ok(()); // TODO remove
+
+		match handle_packet(p) {
+			PacketInfo::Stop => return Ok(()),
+			PacketInfo::Error(x) => return Err(x),
+			PacketInfo::Proceed => {},
+		}
 	}
 }
 
@@ -53,14 +61,57 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 	}
 }
 
+// packet handlers
+
+fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
+	let pbuf = secure_filename(path)?;
+	let mut f = File::create(pbuf)
+		.map_err(|x| format!("Failed creating File: {}", x))?;
+	f.write_all(&content[..])
+		.map_err(|x| format!("Failed writing to File: {}", x))
+}
+
+fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
+	let pbuf = PathBuf::from(path);
+	let mut f = OpenOptions::new().append(true).open(pbuf)
+		.map_err(|x| format!("Failed opening File in append mode: {}", x))?;
+	f.write_all(&content[..])
+		.map_err(|x| format!("Failed appending to File: {}", x))
+}
+
+fn handle_dircreate(path: String) -> Result<(), String> {
+	let pbuf = secure_filename(path)
+		.map_err(|x| format!("Failed Securing Filename: {}", x))?;
+
+	create_dir(pbuf)
+		.map_err(|x| format!("Failed creating Directory: {}", x))
+	
+}
+
+enum PacketInfo {
+	Stop,
+	Proceed,
+	Error(String),
+}
+
+fn handle_packet(p: Packet) -> PacketInfo {
+	let res = match p {
+		Packet::FileCreate { path, content } => handle_filecreate(path, content),
+		Packet::FileAppend { path, content } => handle_fileappend(path, content),
+		Packet::DirectoryCreate { path } => handle_dircreate(path),
+		Packet::Done => return PacketInfo::Stop,
+	};
+	if let Err(x) = res {
+		PacketInfo::Error(x)
+	} else {
+		PacketInfo::Proceed
+	}
+}
+
 // io
 
-use std::fs::{create_dir, File};
-use std::io::{stdin, BufRead, Write};
-use std::env::current_dir;
-use std::path::PathBuf;
-
-fn secure_filename(mut pbuf: PathBuf) -> Result<PathBuf, String> {
+fn secure_filename<T: Into<PathBuf>>(arg: T) -> Result<PathBuf, String> {
+	let mut pbuf = arg.into();
 	while pbuf.exists() {
 		println!("File: {} already exists. Do you want a new name? Empty String for 'No':", pbuf.to_string_lossy());
 		let mut s = String::new();
@@ -73,48 +124,4 @@ fn secure_filename(mut pbuf: PathBuf) -> Result<PathBuf, String> {
 		pbuf.push(s);
 	}
 	return Ok(pbuf);
-}
-
-fn build_file(pbuf: PathBuf, content: &[u8]) -> Result<(), String> {
-	let pbuf = secure_filename(pbuf)?;
-	let mut f = File::create(pbuf)
-		.map_err(|x| format!("Failed creating File: {}", x))?;
-	f.write_all(content)
-		.map_err(|x| format!("Failed writing to File: {}", x))
-}
-
-fn build_dir(pbuf: PathBuf) -> Result<(), String> {
-	let pbuf = secure_filename(pbuf)
-		.map_err(|x| format!("Failed Securing Filename: {}", x))?;
-
-	create_dir(pbuf)
-		.map_err(|x| format!("Failed creating Directory: {}", x))
-}
-
-impl Packet {
-/*
-	fn create_files_to(&self, mut pbuf: PathBuf) -> Result<(), String> {
-		match self {
-			&Packet::File { ref name, ref content } => {
-				pbuf.push(name);
-				build_file(pbuf, content)
-			},
-			&Packet::Directory { ref name, ref packets } => {
-				pbuf.push(name);
-				build_dir(pbuf.clone())?;
-				for packet in packets {
-					packet.create_files_to(pbuf.clone())
-						.map_err(|x| format!("Packet::create_files_to failed: {}", x))?;
-				}
-				Ok(())
-			},
-		}
-	}
-
-	fn create_files(&self) -> Result<(), String> {
-		let pbuf = current_dir()
-			.map_err(|x| format!("Failed detecting current dir: {}", x))?;
-		return self.create_files_to(pbuf);
-	}
-*/
 }
