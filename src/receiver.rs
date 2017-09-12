@@ -32,14 +32,14 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 
 	loop {
 		let mut size_buffer: Vec<u8> = vec![0; 8];
-		socket.read(&mut size_buffer)
+		socket.read_exact(&mut size_buffer)
 			.map_err(|x| format!("Failed reading size from socket: {}", x))?;
 		let size = bincode::deserialize::<u64>(&size_buffer[..])
 			.map(|x| x as usize)
 			.map_err(|x| format!("Failed converting size_buffer to size: {}", x.to_string()))?;
 
 		let mut packet_buffer: Vec<u8> = vec![0; size];
-		socket.read(&mut packet_buffer)
+		socket.read_exact(&mut packet_buffer)
 			.map_err(|x| format!("Failed reading packet from socket: {}", x))?;
 		let p = Packet::deserialize(&packet_buffer)
 			.map_err(|x| format!("Failed deserializing Packet: {}", x))?;
