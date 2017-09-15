@@ -15,7 +15,7 @@ use PORT;
 
 const MAX_CONTENT_SIZE : usize = 1024 * 1024;
 
-pub fn call<T: Iterator<Item=String>>(mut args: T) {
+fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 	let ip = args.next()
 		.expect("Ip address missing");
 	let filename = args.next()
@@ -24,12 +24,23 @@ pub fn call<T: Iterator<Item=String>>(mut args: T) {
 	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
 
-	send(&PathBuf::from(&filename), &mut stream).unwrap();
-	send_packet(&Packet::Done, &mut stream).unwrap();
+	let filename_pathbuf = PathBuf::from(&filename).canonicalize().map_err(|_| String::from("cant canonicalize filename"))?;
+	let filename_path = filename_pathbuf.file_name().ok_or_else(|| format!("cant get filename from {}", &filename))?;
+	let send_path = PathBuf::from(filename_path);
+	//println!("filename = {}; filename_path = {:?}", filename, filename_path);
+	send(&PathBuf::from(&filename), &send_path, &mut stream)?;
+	send_packet(&Packet::Done, &mut stream)?;
+	Ok(())
 }
 
-fn send(path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
-	let open_str: &str = path.to_str()
+pub fn call<T: Iterator<Item=String>>(args: T) {
+	if let Err(err) = call_handler(args) {
+		println!("{}", err);
+	}
+}
+
+fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
+	let open_str: &str = read_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
 	let mut file = File::open(open_str)
 		.map_err(|x| x.to_string())?;
@@ -37,33 +48,35 @@ fn send(path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
 	let metad = file.metadata()
 		.map_err(|x| x.to_string())?;
 	if metad.is_dir() {
-		send_dir(stream, path)
+		send_dir(stream, read_path, send_path)
 	} else {
-		send_file(&mut file, stream, path)
+		send_file(&mut file, stream, read_path, send_path)
 	}
 }
 
-fn send_dir(stream: &mut TcpStream, path: &PathBuf) -> Result<(), String> {
-	let path_str: &str = path.to_str()
+fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
+	let send_path_str: &str = send_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
 	let p: Packet = Packet::DirectoryCreate {
-		path: String::from(path_str),
+		path: String::from(send_path_str),
 	};
 	send_packet(&p, stream).unwrap();
 
 	// send recursive sub directories/files
-	let entries = fs::read_dir(path)
+	let entries = fs::read_dir(read_path)
 		.map_err(|x| x.to_string())?;
 	for entry in entries {
 		let dir = entry.map_err(|x| x.to_string())?;
-		let mut tmp_path = path.clone();
-		tmp_path.push(dir.file_name());
-		send(&tmp_path, stream).unwrap();
+		let mut tmp_read_path = read_path.clone();
+		tmp_read_path.push(dir.file_name());
+		let mut tmp_send_path = send_path.clone();
+		tmp_send_path.push(dir.file_name());
+		send(&tmp_read_path, &tmp_send_path, stream).unwrap(); // !!!!!!!
 	}
 	Ok(())
 }
 
-fn send_file(file: &mut File, stream: &mut TcpStream, path: &PathBuf) -> Result<(), String> {
+fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
 	let mut file_completely_sent : bool = false;
 	let mut file_started : bool = true;
 	while !file_completely_sent {
@@ -74,7 +87,7 @@ fn send_file(file: &mut File, stream: &mut TcpStream, path: &PathBuf) -> Result<
 					file_completely_sent = true;
 					contents.truncate(send_size);
 				}
-				let path_str: &str = path.to_str()
+				let path_str: &str = send_path.to_str()
 					.ok_or_else(|| String::from("cant transform path into string"))?;
 				if file_started {
 					let packet: Packet = Packet::FileCreate {
@@ -92,7 +105,7 @@ fn send_file(file: &mut File, stream: &mut TcpStream, path: &PathBuf) -> Result<
 				file_started = false;
 			},
 			Err(err) => {
-				let path_str: &str = path.to_str()
+				let path_str: &str = read_path.to_str()
 					.ok_or_else(|| String::from("cant transform path into string"))?;
 				return Err(format!("couldnt read from \"{}\": {:?}", path_str, err))
 			}
