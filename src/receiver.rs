@@ -9,7 +9,6 @@ extern crate get_if_addrs;
 
 use packet::Packet;
 
-
 // handler
 
 use PORT;
@@ -77,7 +76,7 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 // packet handlers
 
 fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
-	let pbuf = canonicalize(PathBuf::from(path))?;
+	let pbuf = PathBuf::from(path);
 	if !check_allowance(&pbuf)? {
 		return Err(format!("Creating File is not allowed: {:?}", pbuf));
 	}
@@ -88,7 +87,7 @@ fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
 }
 
 fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
-	let pbuf = canonicalize(PathBuf::from(path))?;
+	let pbuf = PathBuf::from(path);
 	if !check_allowance(&pbuf)? {
 		return Err(format!("Appending to File is not allowed: {:?}", pbuf));
 	}
@@ -132,10 +131,11 @@ fn handle_packet(p: Packet) -> PacketInfo {
 // io
 
 fn check_allowance(p: &PathBuf) -> Result<bool, String> {
+	let p = normalize(p)?;
 	let wd: PathBuf = get_wd()
-		.and_then(canonicalize)
+		.and_then(|x| normalize(&x))
 		.map_err(|x| format!("Failed to check allowance: {}", x))?;
-	Ok(p.starts_with(wd))
+	Ok(p != wd && p.starts_with(wd))
 }
 
 fn get_wd() -> Result<PathBuf, String> {
@@ -145,9 +145,42 @@ fn get_wd() -> Result<PathBuf, String> {
 		.map_err(|x| format!("Couldn't determine working directory: {}", x))
 }
 
-fn canonicalize(pbuf: PathBuf) -> Result<PathBuf, String> {
-	use std::fs;
+fn normalize(pbuf: &PathBuf) -> Result<PathBuf, String> {
+	use std::path::Component;
 
-	fs::canonicalize(pbuf)
-		.map_err(|x| format!("Failed to canonicalize Path: {}", x))
+	let mut components = pbuf.components();
+
+	let mut out_pbuf = match components.next() {
+		Some(Component::Prefix(x)) => PathBuf::from(x.as_os_str()),
+		Some(Component::RootDir) => PathBuf::from(Component::RootDir.as_os_str()),
+		Some(Component::Normal(x)) => get_wd()?.join(x),
+		Some(_) => get_wd()?,
+		None => { return Err(format!("Failed to normalize empty path!")); },
+	};
+
+	for component in components {
+		match component {
+			Component::CurDir => {},
+			Component::ParentDir => { out_pbuf.pop(); }
+			Component::Normal(x) => { out_pbuf.push(x); },
+			comp => { return Err(format!("Normalizing Failed: Initial-Component within path: {:?}, component is: {:?}", &pbuf, comp)); }
+		}
+	}
+
+	Ok(out_pbuf)
+}
+
+#[test]
+fn test_normalize1() {
+	assert_eq!(normalize(&PathBuf::from("/ok")).unwrap(), PathBuf::from("/ok"));
+}
+
+#[test]
+fn test_normalize2() {
+	assert_eq!(normalize(&PathBuf::from("/ok/foo/./bar/..")).unwrap(), PathBuf::from("/ok/foo"));
+}
+
+#[test]
+fn test_normalize3() {
+	assert_eq!(normalize(&PathBuf::from("/")).unwrap(), PathBuf::from("/"));
 }
