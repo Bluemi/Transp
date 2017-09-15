@@ -57,6 +57,7 @@ fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Res
 fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
 	let send_path_str: &str = send_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
+	println!("sending dir: {}", send_path_str);
 	let p: Packet = Packet::DirectoryCreate {
 		path: String::from(send_path_str),
 	};
@@ -77,6 +78,7 @@ fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) ->
 }
 
 fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
+	println!("sending file: {}", send_path.to_str().ok_or_else(|| String::from("cant convert send_path into string"))?);
 	let mut file_completely_sent : bool = false;
 	let mut file_started : bool = true;
 	while !file_completely_sent {
