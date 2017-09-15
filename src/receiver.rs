@@ -41,6 +41,8 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 		.map(|(x, _)| x)
 		.map_err(|x| format!("TcpListener::accept() failed: {:?}", x))?;
 
+	println!("Starting to receive data!");
+
 	loop {
 		let mut size_buffer: Vec<u8> = vec![0; 8];
 		socket.read_exact(&mut size_buffer)
