@@ -104,7 +104,6 @@ fn send_file(file: &mut File, stream: &mut TcpStream, path: &PathBuf) -> Result<
 fn send_packet(packet: &Packet, stream: &mut TcpStream) -> Result<(), String> {
 	let arr = packet.serialize().map_err(|x| x.to_string())?;
 	let len_vec = bincode::serialize(&(arr.len() as u64), bincode::Infinite).map_err(|x| x.to_string())?;
-	println!("size={}", arr.len());
 	if let Err(err) = stream.write(&len_vec) {
 		return Err(format!("failed to write len in stream! {}", err.to_string()));
 	}
