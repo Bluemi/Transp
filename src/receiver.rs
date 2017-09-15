@@ -1,14 +1,14 @@
 use std::iter::Iterator;
 use std::net::TcpListener;
-use std::io::Read;
-use packet::Packet;
-use bincode;
+use std::io::{Read, Write};
+use std::fs::{create_dir, File, OpenOptions};
+use std::path::PathBuf;
 
+use bincode;
 extern crate get_if_addrs;
 
-use std::fs::{create_dir, File, OpenOptions};
-use std::io::{stdin, BufRead, Write};
-use std::path::PathBuf;
+use packet::Packet;
+
 
 // handler
 
@@ -77,7 +77,10 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 // packet handlers
 
 fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
-	let pbuf = secure_filename(path)?;
+	let pbuf = canonicalize(PathBuf::from(path))?;
+	if !check_allowance(&pbuf)? {
+		return Err(format!("Creating File is not allowed: {:?}", pbuf));
+	}
 	let mut f = File::create(pbuf)
 		.map_err(|x| format!("Failed creating File: {}", x))?;
 	f.write_all(&content[..])
@@ -85,7 +88,10 @@ fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
 }
 
 fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
-	let pbuf = PathBuf::from(path);
+	let pbuf = canonicalize(PathBuf::from(path))?;
+	if !check_allowance(&pbuf)? {
+		return Err(format!("Appending to File is not allowed: {:?}", pbuf));
+	}
 	let mut f = OpenOptions::new().append(true).open(pbuf)
 		.map_err(|x| format!("Failed opening File in append mode: {}", x))?;
 	f.write_all(&content[..])
@@ -93,8 +99,10 @@ fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
 }
 
 fn handle_dircreate(path: String) -> Result<(), String> {
-	let pbuf = secure_filename(path)
-		.map_err(|x| format!("Failed Securing Filename: {}", x))?;
+	let pbuf = PathBuf::from(path);
+	if !check_allowance(&pbuf)? {
+		return Err(format!("Creating Directory is not allowed: {:?}", pbuf));
+	}
 
 	create_dir(pbuf)
 		.map_err(|x| format!("Failed creating Directory: {}", x))
@@ -123,18 +131,23 @@ fn handle_packet(p: Packet) -> PacketInfo {
 
 // io
 
-fn secure_filename<T: Into<PathBuf>>(arg: T) -> Result<PathBuf, String> {
-	let mut pbuf = arg.into();
-	while pbuf.exists() {
-		println!("File: {} already exists. Do you want a new name? Empty String for 'No':", pbuf.to_string_lossy());
-		let mut s = String::new();
-		let stdin = stdin();
-		stdin.lock()
-			.read_line(&mut s)
-			.map_err(|x| format!("Failed reading a line: {}", x))?;
-		if s.is_empty() { break; }
-		pbuf.pop();
-		pbuf.push(s);
-	}
-	return Ok(pbuf);
+fn check_allowance(p: &PathBuf) -> Result<bool, String> {
+	let wd: PathBuf = get_wd()
+		.and_then(canonicalize)
+		.map_err(|x| format!("Failed to check allowance: {}", x))?;
+	Ok(p.starts_with(wd))
+}
+
+fn get_wd() -> Result<PathBuf, String> {
+	use std::env::current_dir;
+
+	current_dir()
+		.map_err(|x| format!("Couldn't determine working directory: {}", x))
+}
+
+fn canonicalize(pbuf: PathBuf) -> Result<PathBuf, String> {
+	use std::fs;
+
+	fs::canonicalize(pbuf)
+		.map_err(|x| format!("Failed to canonicalize Path: {}", x))
 }
