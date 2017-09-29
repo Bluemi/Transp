@@ -1,5 +1,5 @@
 use std::iter::Iterator;
-use std::net::TcpStream;
+use std::net::UdpSocket;
 
 use std::fs::File;
 use std::fs;
@@ -22,14 +22,15 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 		.expect("Filename missing");
 
 	let connection_string = format!("{}:{}", ip, PORT);
-	let mut stream = TcpStream::connect(connection_string).unwrap();
+	let mut socket = UdpSocket::bind("0.0.0.0:34757").map_err(|x| x.to_string())?;
+	socket.connect(connection_string).map_err(|x| x.to_string())?;
 
 	let filename_pathbuf = PathBuf::from(&filename).canonicalize().map_err(|_| String::from("cant canonicalize filename"))?;
 	let filename_path = filename_pathbuf.file_name().ok_or_else(|| format!("cant get filename from {}", &filename))?;
 	let send_path = PathBuf::from(filename_path);
 	//println!("filename = {}; filename_path = {:?}", filename, filename_path);
-	send(&PathBuf::from(&filename), &send_path, &mut stream)?;
-	send_packet(&Packet::Done, &mut stream)?;
+	send(&PathBuf::from(&filename), &send_path, &mut socket)?;
+	send_packet(&Packet::Done, &mut socket)?;
 	Ok(())
 }
 
@@ -39,7 +40,7 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 	}
 }
 
-fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
+fn send(read_path: &PathBuf, send_path: &PathBuf, socket: &mut UdpSocket) -> Result<(), String> {
 	let open_str: &str = read_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
 	let mut file = File::open(open_str)
@@ -48,20 +49,20 @@ fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Res
 	let metad = file.metadata()
 		.map_err(|x| x.to_string())?;
 	if metad.is_dir() {
-		send_dir(stream, read_path, send_path)
+		send_dir(socket, read_path, send_path)
 	} else {
-		send_file(&mut file, stream, read_path, send_path)
+		send_file(&mut file, socket, read_path, send_path)
 	}
 }
 
-fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
+fn send_dir(socket: &mut UdpSocket, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
 	let send_path_str: &str = send_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
 	println!("sending dir: {}", send_path_str);
 	let p: Packet = Packet::DirectoryCreate {
 		path: String::from(send_path_str),
 	};
-	send_packet(&p, stream).unwrap();
+	send_packet(&p, socket).unwrap();
 
 	// send recursive sub directories/files
 	let entries = fs::read_dir(read_path)
@@ -72,12 +73,12 @@ fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) ->
 		tmp_read_path.push(dir.file_name());
 		let mut tmp_send_path = send_path.clone();
 		tmp_send_path.push(dir.file_name());
-		send(&tmp_read_path, &tmp_send_path, stream).unwrap(); // !!!!!!!
+		send(&tmp_read_path, &tmp_send_path, socket).unwrap(); // !!!!!!!
 	}
 	Ok(())
 }
 
-fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
+fn send_file(file: &mut File, socket: &mut UdpSocket, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
 	println!("sending file: {}", send_path.to_str().ok_or_else(|| String::from("cant convert send_path into string"))?);
 	let mut file_completely_sent : bool = false;
 	let mut file_started : bool = true;
@@ -96,13 +97,13 @@ fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_
 						path: String::from(path_str),
 						content: contents,
 					};
-					send_packet(&packet, stream).unwrap();
+					send_packet(&packet, socket).unwrap();
 				} else {
 					let packet: Packet = Packet::FileAppend {
 						path: String::from(path_str),
 						content: contents,
 					};
-					send_packet(&packet, stream).unwrap();
+					send_packet(&packet, socket).unwrap();
 				}
 				file_started = false;
 			},
@@ -116,14 +117,14 @@ fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_
 	Ok(())
 }
 
-fn send_packet(packet: &Packet, stream: &mut TcpStream) -> Result<(), String> {
+fn send_packet(packet: &Packet, socket: &mut UdpSocket) -> Result<(), String> {
 	let arr = packet.serialize().map_err(|x| x.to_string())?;
 	let len_vec = bincode::serialize(&(arr.len() as u64), bincode::Infinite).map_err(|x| x.to_string())?;
-	if let Err(err) = stream.write(&len_vec) {
-		return Err(format!("failed to write len in stream! {}", err.to_string()));
+	if let Err(err) = socket.send(&len_vec) {
+		return Err(format!("failed to write len in socket! {}", err.to_string()));
 	}
-	if let Err(err) = stream.write(&arr) {
-		return Err(format!("failed to write in stream! {}", err.to_string()));
+	if let Err(err) = socket.send(&arr) {
+		return Err(format!("failed to write in socket! {}", err.to_string()));
 	}
 	Ok(())
 }
