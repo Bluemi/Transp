@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+// TODO is_allowed should be prevent overwriting files.
+
 pub fn is_allowed(p: &PathBuf) -> Result<bool, String> {
 	let p = normalize(p)?;
 	let wd: PathBuf = normalize(&get_wd()?)

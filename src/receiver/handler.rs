@@ -56,5 +56,4 @@ fn handle_dircreate(path: String) -> Result<(), String> {
 
 	create_dir(pbuf)
 		.map_err(|x| format!("Failed creating Directory: {}", x))
-	
 }
