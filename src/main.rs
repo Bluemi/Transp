@@ -5,7 +5,6 @@ mod packet;
 
 #[macro_use]
 extern crate serde_derive;
-extern crate serde;
 extern crate bincode;
 
 const PORT: u16 = 2345;

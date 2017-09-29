@@ -16,13 +16,13 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 		return Err(format!("No arguments are required for the receiver!"));
 	}
 
-	let mut stream = open_connection()?;
+	let mut socket = open_connection()?;
 	dump_ip();
 
 	println!("Starting to receive data!");
 
 	loop {
-		let packet = fetch_packet(&mut stream)?;
+		let packet = fetch_packet(&mut socket)?;
 		match handle_packet(packet) {
 			PacketInfo::Proceed => continue,
 			PacketInfo::Stop => return Ok(()),
