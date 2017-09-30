@@ -16,8 +16,9 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 		return Err(format!("No arguments are required for the receiver!"));
 	}
 
-	let mut stream = open_connection()?;
 	dump_ip();
+
+	let mut stream = open_connection()?;
 
 	println!("Starting to receive data!");
 
