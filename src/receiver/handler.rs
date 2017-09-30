@@ -27,6 +27,8 @@ pub fn handle_packet(p: Packet) -> PacketInfo {
 }
 
 fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
+	println!("creating file: {}", &path);
+
 	let pbuf = PathBuf::from(path);
 	if !is_allowed(&pbuf)? {
 		return Err(format!("Creating File is not allowed: {:?}", pbuf));
@@ -49,6 +51,8 @@ fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
 }
 
 fn handle_dircreate(path: String) -> Result<(), String> {
+	println!("creating dir:  {}", &path);
+
 	let pbuf = PathBuf::from(path);
 	if !is_allowed(&pbuf)? {
 		return Err(format!("Creating Directory is not allowed: {:?}", pbuf));

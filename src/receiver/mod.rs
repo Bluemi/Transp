@@ -20,8 +20,6 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 
 	let mut stream = open_connection()?;
 
-	println!("Starting to receive data!");
-
 	loop {
 		let packet = fetch_packet(&mut stream)?;
 		match handle_packet(packet) {
