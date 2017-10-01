@@ -5,6 +5,7 @@ use std::fs::File;
 use std::fs;
 use std::io::prelude::*;
 use std::convert::From;
+use std::io;
 
 use std::path::PathBuf;
 
@@ -15,11 +16,15 @@ use PORT;
 
 const MAX_CONTENT_SIZE : usize = 1024 * 1024;
 
-fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
-	let ip = args.next()
-		.expect("Ip address missing");
-	let filename = args.next()
-		.expect("Filename missing");
+fn call_handler<T: Iterator<Item=String>>(args: T) -> Result<(), String> {
+	let (quiets, other_args): (Vec<String>, Vec<String>) = args.partition(|x| x == "-q");
+
+	let quiet = !quiets.is_empty();
+
+	let mut iter = other_args.into_iter();
+
+	let ip = read_cli(iter.next(), "IP-Address")?;
+	let filename = read_cli(iter.next(), "Filename")?;
 
 	let connection_string = format!("{}:{}", ip, PORT);
 	let mut stream = TcpStream::connect(connection_string).unwrap();
@@ -27,8 +32,8 @@ fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
 	let filename_pathbuf = PathBuf::from(&filename).canonicalize().map_err(|_| String::from("cant canonicalize filename"))?;
 	let filename_path = filename_pathbuf.file_name().ok_or_else(|| format!("cant get filename from {}", &filename))?;
 	let send_path = PathBuf::from(filename_path);
-	//println!("filename = {}; filename_path = {:?}", filename, filename_path);
-	send(&PathBuf::from(&filename), &send_path, &mut stream)?;
+
+	send(&PathBuf::from(&filename), &send_path, &mut stream, quiet)?;
 	send_packet(&Packet::Done, &mut stream)?;
 	Ok(())
 }
@@ -39,7 +44,17 @@ pub fn call<T: Iterator<Item=String>>(args: T) {
 	}
 }
 
-fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Result<(), String> {
+fn read_cli(arg: Option<String>, name: &str) -> Result<String, String> {
+	if let Some(x) = arg { return Ok(x); }
+	print!("Enter {}: ", name);
+	io::stdout().flush().unwrap();
+	let mut input = String::new();
+	io::stdin().read_line(&mut input)
+		.map_err(|x| x.to_string())?;
+	return Ok(input);
+}
+
+fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream, quiet: bool) -> Result<(), String> {
 	let open_str: &str = read_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
 	let mut file = File::open(open_str)
@@ -48,16 +63,16 @@ fn send(read_path: &PathBuf, send_path: &PathBuf, stream: &mut TcpStream) -> Res
 	let metad = file.metadata()
 		.map_err(|x| x.to_string())?;
 	if metad.is_dir() {
-		send_dir(stream, read_path, send_path)
+		send_dir(stream, read_path, send_path, quiet)
 	} else {
-		send_file(&mut file, stream, read_path, send_path)
+		send_file(&mut file, stream, read_path, send_path, quiet)
 	}
 }
 
-fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
+fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf, quiet: bool) -> Result<(), String> {
 	let send_path_str: &str = send_path.to_str()
 		.ok_or_else(|| String::from("cant transform path into string"))?;
-	println!("sending dir:  {}", send_path_str);
+	if !quiet { println!("sending dir:  {}", send_path_str); }
 	let p: Packet = Packet::DirectoryCreate {
 		path: String::from(send_path_str),
 	};
@@ -72,13 +87,15 @@ fn send_dir(stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) ->
 		tmp_read_path.push(dir.file_name());
 		let mut tmp_send_path = send_path.clone();
 		tmp_send_path.push(dir.file_name());
-		send(&tmp_read_path, &tmp_send_path, stream).unwrap(); // !!!!!!!
+		send(&tmp_read_path, &tmp_send_path, stream, quiet).unwrap(); // !!!!!!!
 	}
 	Ok(())
 }
 
-fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf) -> Result<(), String> {
-	println!("sending file: {}", send_path.to_str().ok_or_else(|| String::from("cant convert send_path into string"))?);
+fn send_file(file: &mut File, stream: &mut TcpStream, read_path: &PathBuf, send_path: &PathBuf, quiet: bool) -> Result<(), String> {
+	if !quiet {
+		println!("sending file: {}", send_path.to_str().ok_or_else(|| String::from("cant convert send_path into string"))?);
+	}
 	let mut file_completely_sent : bool = false;
 	let mut file_started : bool = true;
 	while !file_completely_sent {
