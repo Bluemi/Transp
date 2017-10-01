@@ -14,7 +14,7 @@ pub fn print_usage() {
 	println!("transp:");
 	println!("");
 	println!("transp r [-q]");
-	println!("transp s [-q] [<IP>] [<FILE>]");
+	println!("transp s [-q] [<IP> [<FILE>]]");
 }
 
 fn main() {
