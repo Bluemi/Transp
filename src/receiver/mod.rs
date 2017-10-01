@@ -27,9 +27,10 @@ fn call_handler<T: Iterator<Item=String>>(args: T) -> Result<(), String> {
 
 	let mut stream = open_connection()?;
 
+	let mut last_file = None;
 	loop {
 		let packet = fetch_packet(&mut stream)?;
-		match handle_packet(packet, quiet) {
+		match handle_packet(packet, quiet, &mut last_file) {
 			PacketInfo::Proceed => continue,
 			PacketInfo::Stop => return Ok(()),
 			PacketInfo::Error(x) => return Err(x),
