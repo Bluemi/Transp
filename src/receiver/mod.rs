@@ -10,19 +10,26 @@ mod allow;
 
 mod handler;
 use self::handler::{PacketInfo, handle_packet};
+use ::print_usage;
 
-fn call_handler<T: Iterator<Item=String>>(mut args: T) -> Result<(), String> {
-	if args.next().is_some() {
-		return Err(format!("No arguments are required for the receiver!"));
+fn call_handler<T: Iterator<Item=String>>(args: T) -> Result<(), String> {
+	let mut quiet = false;
+
+	for x in args {
+		if x == "-q" { quiet = true; }
+		else {
+			print_usage();
+			return Ok(());
+		}
 	}
 
-	dump_ip();
+	if !quiet { dump_ip(); }
 
 	let mut stream = open_connection()?;
 
 	loop {
 		let packet = fetch_packet(&mut stream)?;
-		match handle_packet(packet) {
+		match handle_packet(packet, quiet) {
 			PacketInfo::Proceed => continue,
 			PacketInfo::Stop => return Ok(()),
 			PacketInfo::Error(x) => return Err(x),

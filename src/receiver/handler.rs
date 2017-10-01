@@ -12,11 +12,11 @@ pub enum PacketInfo {
 	Error(String),
 }
 
-pub fn handle_packet(p: Packet) -> PacketInfo {
+pub fn handle_packet(p: Packet, quiet: bool) -> PacketInfo {
 	let res = match p {
-		Packet::FileCreate { path, content } => handle_filecreate(path, content),
+		Packet::FileCreate { path, content } => handle_filecreate(path, content, quiet),
 		Packet::FileAppend { path, content } => handle_fileappend(path, content),
-		Packet::DirectoryCreate { path } => handle_dircreate(path),
+		Packet::DirectoryCreate { path } => handle_dircreate(path, quiet),
 		Packet::Done => return PacketInfo::Stop,
 	};
 	if let Err(x) = res {
@@ -26,8 +26,8 @@ pub fn handle_packet(p: Packet) -> PacketInfo {
 	}
 }
 
-fn handle_filecreate(path: String, content: Vec<u8>) -> Result<(), String> {
-	println!("creating file: {}", &path);
+fn handle_filecreate(path: String, content: Vec<u8>, quiet: bool) -> Result<(), String> {
+	if !quiet { println!("creating file: {}", &path); }
 
 	let pbuf = PathBuf::from(path);
 	if !is_allowed(&pbuf)? {
@@ -50,8 +50,8 @@ fn handle_fileappend(path: String, content: Vec<u8>) -> Result<(), String> {
 		.map_err(|x| format!("Failed appending to File: {}", x))
 }
 
-fn handle_dircreate(path: String) -> Result<(), String> {
-	println!("creating dir:  {}", &path);
+fn handle_dircreate(path: String, quiet: bool) -> Result<(), String> {
+	if !quiet { println!("creating dir:  {}", &path); }
 
 	let pbuf = PathBuf::from(path);
 	if !is_allowed(&pbuf)? {
