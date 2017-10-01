@@ -51,6 +51,7 @@ fn read_cli(arg: Option<String>, name: &str) -> Result<String, String> {
 	let mut input = String::new();
 	io::stdin().read_line(&mut input)
 		.map_err(|x| x.to_string())?;
+	input.pop(); // remove \n
 	return Ok(input);
 }
 
